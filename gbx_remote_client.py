@@ -3,6 +3,12 @@ import asyncio
 
 # GbxRemote Protocol specification: https://wiki.trackmania.io/en/dedicated-server/XML-RPC/gbxremote-protocol
 
+class GbxRemoteFault(xmlrpclib.Fault):
+  def __init__(self, fault, handler):
+    super().__init__(fault.faultCode, fault.faultString)
+    self.handler = handler
+
+
 class GbxRemoteClient:
   def __init__(self, host: str, port: int = 5000) -> None:
     self.host = host
@@ -39,27 +45,36 @@ class GbxRemoteClient:
 
   async def _start_receive_loop(self) -> None:
     while True:
-      handler, data = await self._receive()
+      try:
+        handler, data = await self._receive()
+      except GbxRemoteFault as fault:
+        handler = fault.handler
+        data = fault
 
       try:
         future = self.waiting_messages.pop(handler)
-        future.set_result(data)
+
+        if isinstance(data, GbxRemoteFault):
+          future.set_exception(data)
+        else:
+          future.set_result(data)
       except KeyError:
         raise Exception(f'Unexpected handler: {handler}!')
   
   async def _receive(self, expected_handler: int = None) -> tuple[int, tuple]:
     header = await self.reader.read(8)
     size = int.from_bytes(header[:4], byteorder='little')
-    # print(f'expecting: {size} bytes')
     handler = int.from_bytes(header[4:], byteorder='little')
 
     if expected_handler is not None and  handler != expected_handler:
       raise Exception(f'Handler mismatch! Expected {expected_handler}, got {handler}! Concurrency problem?')
 
     data = await self.reader.read(size)
-    # print(f'received: {len(data)} bytes')
-    data = xmlrpclib.loads(data.decode())
-    data = data[0][0]
+    try:
+      data = xmlrpclib.loads(data.decode())
+      data = data[0][0]
+    except xmlrpclib.Fault as e:
+      raise GbxRemoteFault(e, handler)
 
     return handler, data
   
