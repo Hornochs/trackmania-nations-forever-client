@@ -10,7 +10,11 @@ class GbxRemoteFault(xmlrpclib.Fault):
 
 
 class GbxRemoteClient:
+  INITIAL_HANDLER = 0x80000000
+  MAXIMUM_HANDLER = 0xFFFFFFFF
+  
   def __init__(self, host: str, port: int = 5000) -> None:
+
     self.host = host
     self.port = port
 
@@ -26,7 +30,7 @@ class GbxRemoteClient:
     if header != "GBXRemote 2":
       raise Exception('No "GBXRemote 2" header found! Server may not be a GBXRemote server!')
     
-    self.handler = None
+    self.handler = self.MAXIMUM_HANDLER
     self.waiting_messages: map[int, asyncio.Future] = {}
     self.receive_loop = asyncio.create_task(self._start_receive_loop())
   
@@ -59,6 +63,7 @@ class GbxRemoteClient:
         else:
           future.set_result(data)
       except KeyError:
+        print(f"Unexpected message received: {handler}!")
         raise Exception(f'Unexpected handler: {handler}!')
   
   async def _receive(self, expected_handler: int = None) -> tuple[int, tuple]:
@@ -79,8 +84,8 @@ class GbxRemoteClient:
     return handler, data
   
   async def execute(self, method: str, *args) -> tuple:
-    if self.handler is None:
-      self.handler = 0x80000000
+    if self.handler == self.MAXIMUM_HANDLER:
+      self.handler = self.INITIAL_HANDLER      
     else:
       self.handler += 1
     current_handler = self.handler
