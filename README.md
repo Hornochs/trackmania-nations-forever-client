@@ -2,6 +2,8 @@
 
 This Python client is intended to be used with the TM Nations Forever remote procedure endpoint.
 
+The available methods are documented at [ListMethods](/ListMethods.html).
+
 ## Usage Example
 
 ```python
