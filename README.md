@@ -7,7 +7,7 @@ The available methods are documented at [ListMethods](/ListMethods.html).
 ## Usage Example
 
 ```python
-from gbx_remote_client import GbxRemoteClient as TMClient
+from trackmania_client import TrackManiaClient as TMClient
 import asyncio
 
 async def main():
@@ -19,13 +19,11 @@ async def main():
     await client.authenticate('SuperAdmin', 'SuperAdmin')
     print('Authenticated!')
 
-    version = await client.execute('GetVersion')
+    version = await client.get_version()
     print(f'Version: {version}')
-    status = await client.execute('GetStatus')
+    status = await client.get_status()
     print(f'Status: {status}')
-    response = client.execute('system.listMethods')
-    print(f'Methods: {response}')
-    player_list = await client.execute('GetPlayerList', 100, 0)
+    player_list = await client.get_player_list(100, 0)
     print(f'Players: {player_list}')
 
 
