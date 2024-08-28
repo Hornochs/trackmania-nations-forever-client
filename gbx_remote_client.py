@@ -1,5 +1,4 @@
 import xmlrpc.client as xmlrpclib
-import socket
 import asyncio
 
 # GbxRemote Protocol specification: https://wiki.trackmania.io/en/dedicated-server/XML-RPC/gbxremote-protocol
@@ -22,14 +21,39 @@ class GbxRemoteClient:
       raise Exception('No "GBXRemote 2" header found! Server may not be a GBXRemote server!')
     
     self.handler = None
+    self.waiting_messages: map[int, asyncio.Future] = {}
+    self.receive_loop = asyncio.create_task(self._start_receive_loop())
+  
+  async def close(self) -> None:
+    self.receive_loop.cancel()
+    self.writer.close()
+    await self.writer.wait_closed()
 
-  async def _receive(self, expected_handler: int) -> tuple:
+  async def __aenter__(self):
+    await self.connect()
+
+    return self
+  
+  async def __aexit__(self, exc_type, exc_value, traceback):
+    await self.close()
+
+  async def _start_receive_loop(self) -> None:
+    while True:
+      handler, data = await self._receive()
+
+      try:
+        future = self.waiting_messages.pop(handler)
+        future.set_result(data)
+      except KeyError:
+        raise Exception(f'Unexpected handler: {handler}!')
+  
+  async def _receive(self, expected_handler: int = None) -> tuple[int, tuple]:
     header = await self.reader.read(8)
     size = int.from_bytes(header[:4], byteorder='little')
     # print(f'expecting: {size} bytes')
     handler = int.from_bytes(header[4:], byteorder='little')
 
-    if handler != expected_handler:
+    if expected_handler is not None and  handler != expected_handler:
       raise Exception(f'Handler mismatch! Expected {expected_handler}, got {handler}! Concurrency problem?')
 
     data = await self.reader.read(size)
@@ -37,7 +61,7 @@ class GbxRemoteClient:
     data = xmlrpclib.loads(data.decode())
     data = data[0][0]
 
-    return data
+    return handler, data
   
   async def execute(self, method: str, *args) -> tuple:
     if self.handler is None:
@@ -58,7 +82,9 @@ class GbxRemoteClient:
     self.writer.write(packet)
     await self.writer.drain()
 
-    response_data = await self._receive(current_handler)
+    response_future = asyncio.Future()
+    self.waiting_messages[current_handler] = response_future
+    response_data = await response_future
 
     return response_data
 

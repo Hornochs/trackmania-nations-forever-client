@@ -12,23 +12,21 @@ async def main():
   HOST = 'localhost'
   PORT = 5000
 
-  client = TMClient(HOST, PORT)
-  await client.connect()
-  print('Connected!')
-  await client.authenticate('SuperAdmin', 'SuperAdmin')
-  print('Authenticated!')
+  async with TMClient(HOST, PORT) as client:
+    print('Connected!')
+    await client.authenticate('SuperAdmin', 'SuperAdmin')
+    print('Authenticated!')
 
-  version = await client.execute('GetVersion')
-  print(f'Version: {version}')
-  status = await client.execute('GetStatus')
-  print(f'Status: {status}')
-  response = client.execute('system.listMethods')
-  print(f'Methods: {response}')
-  player_list = await client.execute('GetPlayerList', 100, 0)
-  print(f'Players: {player_list}')
+    version = await client.execute('GetVersion')
+    print(f'Version: {version}')
+    status = await client.execute('GetStatus')
+    print(f'Status: {status}')
+    response = client.execute('system.listMethods')
+    print(f'Methods: {response}')
+    player_list = await client.execute('GetPlayerList', 100, 0)
+    print(f'Players: {player_list}')
 
 
 if __name__ == '__main__':
-  loop = asyncio.get_event_loop()
-  loop.run_until_complete(main())
+  asyncio.run(main())
 ```
