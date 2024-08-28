@@ -48,13 +48,15 @@ async def main():
     await client.authenticate('SuperAdmin', 'SuperAdmin')
     print('Authenticated!')
 
-    client.register_callback_handler(callback_handler)
+    client.register_general_callback_handler(callback_handler)
 
     result = await client.enable_callbacks()
     print(f'Callbacks enabled: {result}')
 
     echo = await client.echo()
     print(f'Echo: {echo}')
+
+    client.unregister_general_callback_handler(callback_handler)
 
     result = await client.disable_callbacks()
     print(f'Callbacks disabled: {result}')
@@ -66,7 +68,7 @@ if __name__ == '__main__':
   asyncio.run(main())
 ```
 
-### Output
+Output:
 ```
 Connected!
 Authenticated!
@@ -74,4 +76,12 @@ Callbacks enabled: True
 Callback: TrackMania.Echo, echo param 2
 Echo: True
 Callbacks disabled: True
+```
+
+Handlers can also be registered to specific callbacks:
+```python
+from trackmania_client import TrackManiaCallback as TMCallback
+
+client.register_callback_handler(TMCallback.ECHO, echo_callback_handler)
+client.unregister_callback_handler(TMCallback.ECHO, echo_callback_handler)
 ```

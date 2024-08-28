@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import Callable
 import xmlrpc.client as xmlrpclib
 import asyncio
@@ -50,7 +51,8 @@ class GbxRemoteClient:
     
     self.handler = self.MAXIMUM_HANDLER
     self.waiting_messages: map[int, asyncio.Future] = {}
-    self.callback_handlers: map[int, Callable[[str, tuple], None]] = []
+    self.general_callback_handlers: list[Callable[[str, tuple], None]] = []
+    self.callback_handlers: map[str, list[Callable[[str, tuple], None]]] = {}
     self.receive_loop = asyncio.create_task(self._start_receive_loop())
   
   async def close(self) -> None:
@@ -137,18 +139,37 @@ class GbxRemoteClient:
     return response_data
   
   def _handle_callback(self, callback: str, data: tuple) -> None:
-    for callback_handler in self.callback_handlers:
+    for callback_handler in self.general_callback_handlers:
       callback_handler(callback, data)
+    
+    if self.callback_handlers.get(callback) is not None:
+      for callback_handler in self.callback_handlers[callback]:
+        callback_handler(callback, data)
   
-  def register_callback_handler(self, handler: Callable[[str, tuple], None]) -> None:
-    self.callback_handlers.append(handler)
+  def register_general_callback_handler(self, handler: Callable[[str, tuple], None]) -> None:
+    self.general_callback_handlers.append(handler)
   
-  async def unregister_callback_handler(self, handler: Callable[[str, tuple], None]) -> None:
-    self.callback_handlers.remove(handler)
+  def register_callback_handler(self, callback: Enum | str, handler: Callable[[str, tuple], None]) -> None:
+    if isinstance(callback, Enum) and isinstance(callback.value, str):
+      callback = callback.value
+
+    if self.callback_handlers.get(callback) is None:
+      self.callback_handlers[callback] = []
+    
+    self.callback_handlers[callback].append(handler)
+  
+  def unregister_general_callback_handler(self, handler: Callable[[str, tuple], None]) -> None:
+    self.general_callback_handlers.remove(handler)
+  
+  def unregister_callback_handler(self, callback: str, handler: Callable[[str, tuple], None]) -> None:
+    if isinstance(callback, Enum) and isinstance(callback.value, str):
+      callback = callback.value
+
+    if self.callback_handlers.get(callback) is not None:
+      self.callback_handlers[callback].remove(handler)
 
   async def authenticate(self, username: str, password: str) -> bool:
     response = await self.execute('Authenticate', username, password)
 
     if not response:
       raise Exception('Authentication failed!')
-
