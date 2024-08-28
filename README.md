@@ -30,3 +30,48 @@ async def main():
 if __name__ == '__main__':
   asyncio.run(main())
 ```
+
+## Callback Usage
+```python
+from trackmania_client import TrackManiaClient as TMClient
+import asyncio
+
+def callback_handler(callback: str, data: tuple):
+  print(f'Callback: {callback}, {data}')
+
+async def main():
+  HOST = 'localhost'
+  PORT = 5000
+
+  async with TMClient(HOST, PORT) as client:
+    print('Connected!')
+    await client.authenticate('SuperAdmin', 'SuperAdmin')
+    print('Authenticated!')
+
+    client.register_callback_handler(callback_handler)
+
+    result = await client.enable_callbacks()
+    print(f'Callbacks enabled: {result}')
+
+    echo = await client.echo()
+    print(f'Echo: {echo}')
+
+    result = await client.disable_callbacks()
+    print(f'Callbacks disabled: {result}')
+
+    echo = await client.echo()
+
+
+if __name__ == '__main__':
+  asyncio.run(main())
+```
+
+### Output
+```
+Connected!
+Authenticated!
+Callbacks enabled: True
+Callback: TrackMania.Echo, echo param 2
+Echo: True
+Callbacks disabled: True
+```

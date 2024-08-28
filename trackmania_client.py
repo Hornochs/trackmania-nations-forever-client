@@ -16,3 +16,6 @@ class TrackManiaClient(GbxRemoteClient):
   
   async def disable_callbacks(self) -> bool:
     return await self.execute('EnableCallbacks', False)
+  
+  async def echo(self, text_1: str = 'echo param 1', text_2: str = 'echo param 2') -> bool:
+    return await self.execute('Echo', text_1, text_2)
