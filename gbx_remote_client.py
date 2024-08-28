@@ -1,5 +1,6 @@
 import xmlrpc.client as xmlrpclib
 import socket
+import asyncio
 
 # GbxRemote Protocol specification: https://wiki.trackmania.io/en/dedicated-server/XML-RPC/gbxremote-protocol
 
@@ -8,14 +9,13 @@ class GbxRemoteClient:
     self.host = host
     self.port = port
 
-  def connect(self) -> None:
-    self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    self.socket.connect((socket.gethostbyname(self.host), self.port))
+  async def connect(self) -> None:
+    self.reader, self.writer = await asyncio.open_connection(self.host, self.port)
 
-    data = self.socket.recv(4)
+    data = await self.reader.read(4)
     headerLength = int.from_bytes(data, byteorder='little')
     
-    data = self.socket.recv(headerLength)
+    data = await self.reader.read(headerLength)
     header = data.decode()
 
     if header != "GBXRemote 2":
@@ -23,8 +23,8 @@ class GbxRemoteClient:
     
     self.handler = None
 
-  def _receive(self, expected_handler: int) -> tuple:
-    header = self.socket.recv(8)
+  async def _receive(self, expected_handler: int) -> tuple:
+    header = await self.reader.read(8)
     size = int.from_bytes(header[:4], byteorder='little')
     # print(f'expecting: {size} bytes')
     handler = int.from_bytes(header[4:], byteorder='little')
@@ -32,14 +32,14 @@ class GbxRemoteClient:
     if handler != expected_handler:
       raise Exception(f'Handler mismatch! Expected {expected_handler}, got {handler}! Concurrency problem?')
 
-    data = self.socket.recv(size)
+    data = await self.reader.read(size)
     # print(f'received: {len(data)} bytes')
     data = xmlrpclib.loads(data.decode())
     data = data[0][0]
 
     return data
   
-  def execute(self, method: str, *args) -> tuple:
+  async def execute(self, method: str, *args) -> tuple:
     if self.handler is None:
       self.handler = 0x80000000
     else:
@@ -55,14 +55,15 @@ class GbxRemoteClient:
     packet += handler_bytes
     packet += data
 
-    self.socket.send(packet)
+    self.writer.write(packet)
+    await self.writer.drain()
 
-    response_data = self._receive(current_handler)
+    response_data = await self._receive(current_handler)
 
     return response_data
 
-  def authenticate(self, username: str, password: str) -> bool:
-    response = self.execute('Authenticate', username, password)
+  async def authenticate(self, username: str, password: str) -> bool:
+    response = await self.execute('Authenticate', username, password)
 
     if not response:
       raise Exception('Authentication failed!')
