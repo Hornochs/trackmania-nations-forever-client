@@ -31,6 +31,8 @@ if __name__ == '__main__':
   asyncio.run(main())
 ```
 
+If no response is received after the default timeout of 10 seconds a `TimeoutError` is raised.
+
 ## Callback Usage
 ```python
 from trackmania_client import TrackManiaClient as TMClient

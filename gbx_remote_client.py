@@ -79,8 +79,6 @@ class GbxRemoteClient:
         data = fault
       
       if isinstance(packet, GbxRemoteCallbackPacket):
-        # received a callback
-        # print(f"Received callback: {handler}, {data}")
         self._handle_callback(packet.callback, data)
       else:
         try:
@@ -91,8 +89,8 @@ class GbxRemoteClient:
           else:
             future.set_result(data)
         except KeyError:
-          print(f"Unexpected message received: {handler}!")
-          raise Exception(f'Unexpected handler: {handler}!')
+          # message was not expected -> ignore
+          continue
   
   async def _receive(self, expected_handler: int = None) -> GbxRemotePacket:
     header = await self.reader.read(8)
@@ -113,7 +111,7 @@ class GbxRemoteClient:
     else:
       return GbxRemotePacket(handler, data[0][0])
   
-  async def execute(self, method: str, *args) -> tuple:
+  async def execute(self, method: str, *args, response_timeout: float = 10) -> tuple:
     if self.handler == self.MAXIMUM_HANDLER:
       self.handler = self.INITIAL_HANDLER      
     else:
@@ -134,7 +132,7 @@ class GbxRemoteClient:
 
     response_future = asyncio.Future()
     self.waiting_messages[current_handler] = response_future
-    response_data = await response_future
+    response_data = await asyncio.wait_for(response_future, timeout=response_timeout)
 
     return response_data
   
