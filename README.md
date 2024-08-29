@@ -4,6 +4,10 @@ This Python client is intended to be used with the TM Nations Forever remote pro
 
 The available methods are documented at [ListMethods](/ListMethods.html).
 
+It has been built for the dedicated server version of `2011-02-21`.
+
+The hardcoded TrackMania RPC method calls have been AI generated and mostly not tested!
+
 ## Usage Example
 
 ```python

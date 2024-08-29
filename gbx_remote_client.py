@@ -171,3 +171,19 @@ class GbxRemoteClient:
 
     if not response:
       raise Exception('Authentication failed!')
+  
+  async def list_methods(self) -> list:
+    """Return an array of all available XML-RPC methods on this server."""
+    return await self.execute('system.listMethods')
+  
+  async def method_signature(self, method_name: str) -> list:
+    """Given the name of a method, return an array of legal signatures."""
+    return await self.execute('system.methodSignature', method_name)
+  
+  async def method_help(self, method_name: str) -> str:
+    """Given the name of a method, return a help string."""
+    return await self.execute('system.methodHelp', method_name)
+  
+  # async def multicall(self, calls: list) -> list:
+  #   """Process an array of calls, and return an array of results."""
+  #   return await self.execute('system.multicall', calls)
