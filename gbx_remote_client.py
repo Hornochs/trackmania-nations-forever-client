@@ -69,45 +69,63 @@ class GbxRemoteClient:
     await self.close()
 
   async def _start_receive_loop(self) -> None:
-    while True:
-      try:
-        packet = await self._receive()
-        handler = packet.handler
-        data = packet.data
-      except GbxRemoteFault as fault:
-        handler = fault.handler
-        data = fault
-      
-      if isinstance(packet, GbxRemoteCallbackPacket):
-        self._handle_callback(packet.callback, data)
-      else:
+    try:
+      while True:
         try:
-          future = self.waiting_messages.pop(handler)
-
-          if isinstance(data, GbxRemoteFault):
-            future.set_exception(data)
-          else:
-            future.set_result(data)
-        except KeyError:
-          # message was not expected -> ignore
+          packet = await self._receive()
+          handler = packet.handler
+          data = packet.data
+        except GbxRemoteFault as fault:
+          handler = fault.handler
+          data = fault
+        except asyncio.IncompleteReadError as e:
+          print(f'Caught IncompleteReadError: {e}')
           continue
+        except ConnectionError as e:
+          return
+        except Exception as e:
+          print(f'Error receiving packet: {e}')
+          await asyncio.sleep(1)
+          continue
+        
+        if isinstance(packet, GbxRemoteCallbackPacket):
+          self._handle_callback(packet.callback, data)
+        else:
+          try:
+            future = self.waiting_messages.pop(handler)
+
+            if isinstance(data, GbxRemoteFault):
+              future.set_exception(data)
+            else:
+              future.set_result(data)
+          except KeyError:
+            # message was not expected -> ignore
+            continue
+    except Exception as e:
+      print(f'Error in receive loop: {e}')
   
   async def _receive(self, expected_handler: int = None) -> GbxRemotePacket:
     header = await self.reader.read(8)
     size = int.from_bytes(header[:4], byteorder='little')
+    
+    if size == 0:
+      raise ConnectionResetError('Receiving 0 bytes from server!')
+
     handler = int.from_bytes(header[4:], byteorder='little')
 
     if expected_handler is not None and  handler != expected_handler:
       raise Exception(f'Handler mismatch! Expected {expected_handler}, got {handler}! Concurrency problem?')
 
-    data = await self.reader.read(size)
+    data = await self.reader.readexactly(size)
+
     try:
+      #print(f'Received: {data} instead of {size} bytes')
       data = xmlrpclib.loads(data.decode())
     except xmlrpclib.Fault as e:
       raise GbxRemoteFault(e, handler)
 
     if len(data) >= 2 and data[1] is not None:
-      return GbxRemoteCallbackPacket(handler, data[0][0], data[1])
+      return GbxRemoteCallbackPacket(handler, data[0], data[1])
     else:
       return GbxRemotePacket(handler, data[0][0])
   
