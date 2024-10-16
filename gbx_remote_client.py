@@ -2,6 +2,7 @@ from enum import Enum
 from typing import Callable
 import xmlrpc.client as xmlrpclib
 import asyncio
+import traceback
 
 # GbxRemote Protocol specification: https://wiki.trackmania.io/en/dedicated-server/XML-RPC/gbxremote-protocol
 
@@ -69,40 +70,42 @@ class GbxRemoteClient:
     await self.close()
 
   async def _start_receive_loop(self) -> None:
-    try:
-      while True:
+    while True:
+      try:
+        packet = await self._receive()
+        handler = packet.handler
+        data = packet.data
+      except GbxRemoteFault as fault:
+        handler = fault.handler
+        data = fault
+      except asyncio.IncompleteReadError as e:
+        print(f'Caught IncompleteReadError: {e}')
+        continue
+      except ConnectionError as e:
+        return
+      except Exception as e:
+        print(f'Error receiving packet: {e}')
+        # await asyncio.sleep(1)
+        continue
+      
+      if isinstance(packet, GbxRemoteCallbackPacket):
         try:
-          packet = await self._receive()
-          handler = packet.handler
-          data = packet.data
-        except GbxRemoteFault as fault:
-          handler = fault.handler
-          data = fault
-        except asyncio.IncompleteReadError as e:
-          print(f'Caught IncompleteReadError: {e}')
-          continue
-        except ConnectionError as e:
-          return
-        except Exception as e:
-          print(f'Error receiving packet: {e}')
-          await asyncio.sleep(1)
-          continue
-        
-        if isinstance(packet, GbxRemoteCallbackPacket):
           self._handle_callback(packet.callback, data)
-        else:
-          try:
-            future = self.waiting_messages.pop(handler)
+        except Exception as e:
+          print(f'Error handling {packet.callback} callback:')
+          traceback.print_exc()
+          continue
+      else:
+        try:
+          future = self.waiting_messages.pop(handler)
 
-            if isinstance(data, GbxRemoteFault):
-              future.set_exception(data)
-            else:
-              future.set_result(data)
-          except KeyError:
-            # message was not expected -> ignore
-            continue
-    except Exception as e:
-      print(f'Error in receive loop: {e}')
+          if isinstance(data, GbxRemoteFault):
+            future.set_exception(data)
+          else:
+            future.set_result(data)
+        except KeyError:
+          # message was not expected -> ignore
+          continue
   
   async def _receive(self, expected_handler: int = None) -> GbxRemotePacket:
     header = await self.reader.read(8)
@@ -156,11 +159,15 @@ class GbxRemoteClient:
   
   def _handle_callback(self, callback: str, data: tuple) -> None:
     for callback_handler in self.general_callback_handlers:
-      callback_handler(callback, data)
+      result = callback_handler(callback, data)
+      if asyncio.iscoroutine(result):
+        asyncio.create_task(result)
     
     if self.callback_handlers.get(callback) is not None:
       for callback_handler in self.callback_handlers[callback]:
-        callback_handler(callback, data)
+        result = callback_handler(callback, data)
+        if asyncio.iscoroutine(result):
+          asyncio.create_task(result)
   
   def register_general_callback_handler(self, handler: Callable[[str, tuple], None]) -> None:
     self.general_callback_handlers.append(handler)
