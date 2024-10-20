@@ -1,6 +1,6 @@
 from enum import Enum
 from typing import Callable
-from gbx_remote_client import GbxRemoteClient
+from .gbx_remote_client import GbxRemoteClient
 
 
 class TrackManiaCallback(Enum):

@@ -1,2 +1,7 @@
 .vscode
 __pycache__
+
+# packaging
+build/
+dist/
+*.egg-info/
