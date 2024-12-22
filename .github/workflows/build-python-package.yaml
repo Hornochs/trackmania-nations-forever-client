@@ -10,7 +10,7 @@ defaults:
     working-directory: .
 
 jobs:
-  test:
+  build:
     name: Build Python Package
     runs-on: ubuntu-20.04
     
@@ -30,8 +30,14 @@ jobs:
       - name: Build package
         run: python setup.py sdist bdist_wheel
       
-      - name: Upload package
+      - name: Upload package to GitHub Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: package
           path: dist/
+      
+      - name: Publish package to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          user: __token__
+          password: ${{ secrets.PYPI_TM_CLIENT_API_KEY }}
