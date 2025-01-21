@@ -11,7 +11,7 @@ The hardcoded TrackMania RPC method calls have been AI generated and mostly not 
 ## Usage Example
 
 ```python
-from trackmania_client import TrackManiaClient as TMClient
+from trackmania.trackmania_client import TrackManiaClient as TMClient
 import asyncio
 
 async def main():
@@ -39,7 +39,7 @@ If no response is received after the default timeout of 10 seconds a `TimeoutErr
 
 ## Callback Usage
 ```python
-from trackmania_client import TrackManiaClient as TMClient
+from trackmania.trackmania_client import TrackManiaClient as TMClient
 import asyncio
 
 def callback_handler(callback: str, data: tuple):
@@ -86,7 +86,7 @@ Callbacks disabled: True
 
 Handlers can also be registered to specific callbacks:
 ```python
-from trackmania_client import TrackManiaCallback as TMCallback
+from trackmania.trackmania_client import TrackManiaClient as TMClient
 
 client.register_callback_handler(TMCallback.ECHO, echo_callback_handler)
 client.unregister_callback_handler(TMCallback.ECHO, echo_callback_handler)
